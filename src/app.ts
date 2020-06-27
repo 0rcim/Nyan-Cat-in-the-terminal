@@ -1,32 +1,20 @@
-import { readdirSync } from "fs";
-import { resolve } from "path";
-import { ParseBlock , ParseFrame , combineFrames } from "./utils";
+import { NyanCat , color } from "./utils";
+import { argv } from "process";
 
-let filename_validator = /([\s\S]+).zIndex=([-\d]+)$/i;
-let datas = readdirSync(
-  resolve(__dirname, "../data/")
-).filter(i => filename_validator.test(i));
+let [,,cat_name] = argv;
 
-let blocks = datas.map(name => {
-  let mth : any[] = name.match(filename_validator);
-  let block = new ParseBlock(name), frames : any[] = new ParseFrame(block.parsedJSON).frames;
-  return {
-    name: mth[1],
-    zindex: mth[2]*1,
-    parsedFrames: frames
-  }
-})
+const totFrame = 6;
+const GrayCat = new NyanCat("../data/" + cat_name, totFrame);
+let currentFrameis = 0;
 
-blocks.sort((a,b) => a.zindex - b.zindex);
+let coloredGrayCat : string[] = GrayCat.FRAMESPOOL.map(item => color(item));
 
-let framesPool = combineFrames(blocks), f = 0;
-
-console.log("\x1b[100D\x1b[2J\n\x1b[s");
+console.log("\n\x1b[s");
 
 move();
 
-let timer = setInterval(move, 200);
+let timer = setInterval(move, 120);
 
-function move() {
-  console.log("\x1b[u" + framesPool[f++%6].map(item => item.join("")).join("\n\x1b[0m") + "\n");
-}
+function move(){
+  console.log("\x1b[u" + coloredGrayCat[currentFrameis++ % totFrame] + "\nPress `Ctrl + C` to Exit.");
+};

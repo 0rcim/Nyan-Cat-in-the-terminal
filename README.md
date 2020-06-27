@@ -12,6 +12,7 @@
 # Run
 
 ```bash
-node ./build/app.js
+node ./build/app.js Black.cat # load Black.cat
+node ./build/app.js # default: Gray.cat
 #!# 确保窗口有足够大小
 ```
