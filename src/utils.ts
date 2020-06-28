@@ -1,9 +1,10 @@
 import { readFileSync , readdirSync , existsSync } from "fs";
 import { resolve } from "path";
-import { FileSectionObj } from "./block";
+import { FileSectionObj , ColorVal } from "./block";
 
 class Ansi256Colors {
   protected LIB:{[index: string]: number};
+  protected RGB_LIB:ColorVal[] = [];
   constructor(relative_lib_path:string) {
     let lib_text = readFileSync(
       resolve(__dirname, relative_lib_path),
@@ -12,9 +13,15 @@ class Ansi256Colors {
     let lib = {};
     lib_text.split(/[\n\r]+/).filter(i => i).forEach((hex_str, idx) => {
       let RGB : any[] = hex_str.match(/[0-9A-F]{2}/ig);
-      lib[RGB.join("").toUpperCase()] = idx;
+      let RGBval : string = RGB.join("").toUpperCase();
+      lib[RGBval] = idx;
+      this.RGB_LIB.push({
+        RGB: RGB.map(i => parseInt("0x"+i)),
+        hex: RGBval
+      });
     });
     this.LIB = lib;
+    this.queryBestMatch("FFD75F")
   }
 
   query(hex_color:string) {
@@ -25,11 +32,22 @@ class Ansi256Colors {
         return this.query([R,R,G,G,B,B].join("").toUpperCase());
       } else if (mth[0].length === 6) {
         let c = this.LIB[mth[0]];
-        return c ? c : this.query("000");
+        return c ? c : this.queryBestMatch(hex_color);
       }
     } else {
       return this.query("000")
     }
+  }
+
+  queryBestMatch(color:string) {
+    let threshold : number = -20;
+    let _RGB : any[] = color.match(/\w\w/g).map(i => parseInt("0x"+i) + threshold);
+    let rest = this.RGB_LIB.filter(v => v.RGB[0] >= _RGB[0]).filter(v => v.RGB[1] >= _RGB[1]).filter(v => v.RGB[2] >= _RGB[2]);
+    let res = rest.map(item => {
+      item.score = item.RGB.reduce((p,c,i) => p+(c-_RGB[i]+threshold), 0) / 3;
+      return item
+    }).sort((a, b) => a.score-b.score)[0];
+    return res ? this.LIB[res.hex] : this.query("000");
   }
 }
 
@@ -57,7 +75,6 @@ export class Frame {
     let sections : {MAP: FileSectionObj[], FRAME: FileSectionObj[]} = {MAP:[],FRAME:[]};
     let current_section_title : string = "";
     let mth : any[] = content.split(/[\n\r]+/).filter(i => i);
-    // console.log(mth)
     mth.forEach(line => {
       if (line.match(/^\[[\s\S]*\]$/)) {
         let m = line.match(/^\[(MAP|FRAME)/);
@@ -70,9 +87,6 @@ export class Frame {
         sections[current_section_title][sections[current_section_title].length-1].body.push(line)
       }
     });
-    // new MapSection(sections.MAP[0], color_lib);
-    // new FrameSection(sections.FRAME[0])
-    // console.log(sections);
     let poolMap = sections.MAP.map(m => (o_x, o_y) => new MapSection(m, color_lib, o_x, o_y));
     let poolFrame = sections.FRAME.map(frm => new FrameSection(frm));
     let n_frames = poolFrame.map(frmSec => {
@@ -146,10 +160,9 @@ export class NyanCat {
   constructor(relative_cat_dir:any, totFrame:number) {
     if (!existsSync(resolve(__dirname, relative_cat_dir))) relative_cat_dir = "../data/Gray.cat/";
     let path = resolve(__dirname, relative_cat_dir);
-    console.log(path)
     let files = readdirSync(path);
     let parts = files.map(file => {
-      return new Frame(resolve(relative_cat_dir, file))
+      return new Frame(resolve(__dirname, relative_cat_dir, file))
     });
     parts.sort((a, b) => a.ZINDEX-b.ZINDEX);
     this.parts = parts;
@@ -166,7 +179,7 @@ export class NyanCat {
       }), {row: 0, col: 0});
     let canvas : string = JSON.stringify(new Array(row).fill(new Array(col).fill(-1)));
     let a = 0;
-    while(a < 6) {
+    while(a < this.totFrame) {
       let frames = JSON.parse(canvas);
       for (let i=0; i<this.parts.length; i++) {
         for (let k=0; k<this.parts[i].FRAMES[a].map.length; k++) {
@@ -177,7 +190,6 @@ export class NyanCat {
           }
         }
       }
-      // console.log(color(frames), "\n")
       this.FRAMESPOOL.push(frames);
       a++;
     };
